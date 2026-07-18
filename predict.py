@@ -28,9 +28,18 @@ def main():
 
     # 1. Load configuration
     config = Config.load_from_yaml(args.config)
+    
+    if args.output_dir != "outputs/predictions/":
+        config.outputs.predictions = args.output_dir
+        # Resolve gradcam to be adjacent to customized predictions dir
+        gradcam_dir = os.path.join(os.path.dirname(os.path.abspath(args.output_dir)), "gradcam")
+    else:
+        args.output_dir = config.outputs.predictions
+        gradcam_dir = config.outputs.gradcam
+
     os.makedirs(args.output_dir, exist_ok=True)
-    figures_dir = args.output_dir.replace("predictions", "figures")
-    os.makedirs(figures_dir, exist_ok=True)
+    os.makedirs(gradcam_dir, exist_ok=True)
+    figures_dir = gradcam_dir
 
     # 2. Build model and load weights
     print("Building model architecture...")

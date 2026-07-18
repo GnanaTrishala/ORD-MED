@@ -33,11 +33,13 @@ def create_stage_datasets():
     """Splits the integrated CSV files into Stage 1 (APTOS) and Stage 2 (IDRiD) sub-metadata."""
     print("Preparing Stage 1 (APTOS) and Stage 2 (IDRiD) partition files...")
     
-    os.makedirs("dataset", exist_ok=True)
+    base_proj_dir = "/kaggle/working/ORD-MED" if os.path.exists("/kaggle/working") else "."
+    dataset_dir = os.path.join(base_proj_dir, "dataset")
+    os.makedirs(dataset_dir, exist_ok=True)
     
     splits = ["train", "val", "test"]
     for split in splits:
-        integrated_path = f"dataset/integrated_{split}.csv"
+        integrated_path = os.path.join(dataset_dir, f"integrated_{split}.csv")
         if not os.path.exists(integrated_path):
             raise FileNotFoundError(f"Missing integrated dataset mapping: {integrated_path}")
             
@@ -45,13 +47,13 @@ def create_stage_datasets():
         
         # Filter for Stage 1 (APTOS only)
         df_aptos = df[df["dataset_source"] == "aptos"]
-        df_aptos.to_csv(f"dataset/aptos_{split}_stage1.csv", index=False)
+        df_aptos.to_csv(os.path.join(dataset_dir, f"aptos_{split}_stage1.csv"), index=False)
         
         # Filter for Stage 2 (IDRiD only)
         df_idrid = df[df["dataset_source"] == "idrid"]
-        df_idrid.to_csv(f"dataset/idrid_{split}_stage2.csv", index=False)
+        df_idrid.to_csv(os.path.join(dataset_dir, f"idrid_{split}_stage2.csv"), index=False)
         
-    print("Partition metadata files successfully written to dataset/")
+    print(f"Partition metadata files successfully written to {dataset_dir}/")
 
 
 def run_training_stage(
@@ -93,8 +95,26 @@ def run_training_stage(
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(params, lr=config.trainer.lr, weight_decay=config.trainer.weight_decay)
 
+    # Check if last.pt exists and belongs to the current stage (train_csv matches)
+    last_pt_path = os.path.join(config.trainer.save_dir, "last.pt")
+    use_last_pt = False
+    if os.path.exists(last_pt_path):
+        try:
+            checkpoint = torch.load(last_pt_path, map_location="cpu", weights_only=False)
+            checkpoint_config = checkpoint.get("config", None)
+            if checkpoint_config is not None:
+                curr_csv = getattr(config.dataset, "train_csv", "")
+                ckpt_csv = getattr(checkpoint_config.dataset, "train_csv", "")
+                if curr_csv == ckpt_csv:
+                    use_last_pt = True
+        except Exception:
+            pass
+
+    if use_last_pt:
+        logger.info(f"Auto-resume checkpoint last.pt found for Stage {stage_num}. Resuming stage from last.pt.")
+        model, optimizer, start_epoch = load_checkpoint(model, last_pt_path, optimizer)
     # Load starting checkpoint weights if provided
-    if checkpoint_load_path and os.path.exists(checkpoint_load_path):
+    elif checkpoint_load_path and os.path.exists(checkpoint_load_path):
         logger.info(f"Loading checkpoint weights to start Stage {stage_num}: {checkpoint_load_path}")
         model, optimizer, start_epoch = load_checkpoint(model, checkpoint_load_path, optimizer)
         logger.info(f"Resuming stage from epoch {start_epoch + 1}")
@@ -148,8 +168,25 @@ def run_training_stage(
                 torch.cuda.empty_cache()
 
             # Identify last saved epoch checkpoint to resume
+            last_pt_path = os.path.join(config.trainer.save_dir, "last.pt")
             latest_path = os.path.join(config.trainer.save_dir, f"{config.trainer.experiment_name}_latest.pth")
-            if os.path.exists(latest_path):
+            use_last_pt = False
+            if os.path.exists(last_pt_path):
+                try:
+                    checkpoint = torch.load(last_pt_path, map_location="cpu", weights_only=False)
+                    checkpoint_config = checkpoint.get("config", None)
+                    if checkpoint_config is not None:
+                        curr_csv = getattr(config.dataset, "train_csv", "")
+                        ckpt_csv = getattr(checkpoint_config.dataset, "train_csv", "")
+                        if curr_csv == ckpt_csv:
+                            use_last_pt = True
+                except Exception:
+                    pass
+
+            if use_last_pt:
+                logger.info(f"[RECOVERY] Resuming training from last.pt")
+                model, optimizer, start_epoch = load_checkpoint(model, last_pt_path, optimizer)
+            elif os.path.exists(latest_path):
                 logger.info(f"[RECOVERY] Resuming training from last saved checkpoint: {latest_path}")
                 model, optimizer, start_epoch = load_checkpoint(model, latest_path, optimizer)
             else:
@@ -203,9 +240,9 @@ def run_evaluation_and_reports(config: Config, checkpoint_path: str, logger) -> 
     metrics, predictions = evaluator.evaluate()
 
     # Save prediction CSV and reports
-    predictions_dir = "outputs/predictions"
-    reports_dir = "outputs/reports"
-    figures_dir = "outputs/figures"
+    predictions_dir = config.outputs.predictions
+    reports_dir = config.outputs.metrics
+    figures_dir = config.outputs.plots
     
     os.makedirs(predictions_dir, exist_ok=True)
     os.makedirs(reports_dir, exist_ok=True)
@@ -289,8 +326,10 @@ def main():
     create_stage_datasets()
 
     # 2. Stage 1: Pre-train DR on APTOS
-    stage1_train_csv = "dataset/aptos_train_stage1.csv"
-    stage1_val_csv = "dataset/aptos_val_stage1.csv"
+    base_proj_dir = "/kaggle/working/ORD-MED" if os.path.exists("/kaggle/working") else "."
+    dataset_dir = os.path.join(base_proj_dir, "dataset")
+    stage1_train_csv = os.path.join(dataset_dir, "aptos_train_stage1.csv")
+    stage1_val_csv = os.path.join(dataset_dir, "aptos_val_stage1.csv")
     best_dr_checkpoint = os.path.join(config.trainer.save_dir, "best_dr_model.pt")
     
     stage1_best_pth = run_training_stage(
@@ -305,8 +344,8 @@ def main():
     )
 
     # 3. Stage 2: Fine-tune multi-task network on IDRiD
-    stage2_train_csv = "dataset/idrid_train_stage2.csv"
-    stage2_val_csv = "dataset/idrid_val_stage2.csv"
+    stage2_train_csv = os.path.join(dataset_dir, "idrid_train_stage2.csv")
+    stage2_val_csv = os.path.join(dataset_dir, "idrid_val_stage2.csv")
     best_final_checkpoint = os.path.join(config.trainer.save_dir, "best_model.pt")
 
     # We resume/initialize Stage 2 using the best model from Stage 1
@@ -328,7 +367,8 @@ def main():
     metrics = run_evaluation_and_reports(config, best_final_checkpoint, logger)
 
     # 5. Write final markdown research report
-    write_summary_report(metrics, "outputs/training_summary.md")
+    summary_report_path = os.path.join(config.outputs.evaluation, "training_summary.md")
+    write_summary_report(metrics, summary_report_path)
     
     logger.info("\n=======================================================")
     logger.info("ORD-MED TWO-STAGE TRAINING WORKFLOW COMPLETED SUCCESSFULLY!")

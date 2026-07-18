@@ -349,16 +349,19 @@ def main():
     train_integrated = train_integrated.sample(frac=1.0, random_state=42).reset_index(drop=True)
 
     # 5. Export integrated metadata CSV files
-    os.makedirs("dataset", exist_ok=True)
-    train_integrated.to_csv("dataset/integrated_train.csv", index=False)
-    val_integrated.to_csv("dataset/integrated_val.csv", index=False)
-    test_integrated.to_csv("dataset/integrated_test.csv", index=False)
-    print("\nExported integrated metadata CSV files to dataset/integrated_*.csv")
+    base_proj_dir = "/kaggle/working/ORD-MED" if os.path.exists("/kaggle/working") else "."
+    dataset_dir = os.path.join(base_proj_dir, "dataset")
+    os.makedirs(dataset_dir, exist_ok=True)
+    train_integrated.to_csv(os.path.join(dataset_dir, "integrated_train.csv"), index=False)
+    val_integrated.to_csv(os.path.join(dataset_dir, "integrated_val.csv"), index=False)
+    test_integrated.to_csv(os.path.join(dataset_dir, "integrated_test.csv"), index=False)
+    print(f"\nExported integrated metadata CSV files to {dataset_dir}/integrated_*.csv")
 
     # 6. Generate statistics and figures
     generate_statistics(train_integrated, val_integrated, test_integrated)
     
-    figures_dir = "outputs/figures"
+    figures_dir = os.path.join(base_proj_dir, "outputs/plots")
+    os.makedirs(figures_dir, exist_ok=True)
     plot_distributions(train_integrated, val_integrated, test_integrated, os.path.join(figures_dir, "integrated_dataset_distribution.png"))
     save_sample_grid(train_integrated, os.path.join(figures_dir, "integrated_sample_images.png"))
 

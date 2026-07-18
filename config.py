@@ -70,13 +70,48 @@ class TrainerConfig:
     lr_scheduler: str = "CosineAnnealingLR"
     device: str = "cuda"
     seed: int = 42
-    save_dir: str = field(default_factory=lambda: os.environ.get("ORD_MED_SAVE_DIR", "outputs/checkpoints/"))
+    save_dir: str = "outputs/checkpoints/"
     checkpoint_path: Optional[str] = None     # Checkpoint paths (loading)
-    log_dir: str = field(default_factory=lambda: os.environ.get("ORD_MED_LOG_DIR", "outputs/logs/"))
+    log_dir: str = "outputs/logs/"
     project_name: str = "ORD-MED"
     experiment_name: str = "base_experiment"
     use_amp: bool = True                      # Mixed precision option (Automatic Mixed Precision)
     patience: int = 10                        # Early stopping patience epochs
+
+
+@dataclass
+class OutputsConfig:
+    base_dir: str = "/kaggle/working/ORD-MED/outputs"
+    checkpoints: Optional[str] = None
+    logs: Optional[str] = None
+    tensorboard: Optional[str] = None
+    evaluation: Optional[str] = None
+    gradcam: Optional[str] = None
+    predictions: Optional[str] = None
+    metrics: Optional[str] = None
+    plots: Optional[str] = None
+
+    def __post_init__(self):
+        # Store what was explicitly set by the user/YAML to preserve overrides
+        if not hasattr(self, "_explicit_checkpoints"):
+            self._explicit_checkpoints = self.checkpoints
+            self._explicit_logs = self.logs
+            self._explicit_tensorboard = self.tensorboard
+            self._explicit_evaluation = self.evaluation
+            self._explicit_gradcam = self.gradcam
+            self._explicit_predictions = self.predictions
+            self._explicit_metrics = self.metrics
+            self._explicit_plots = self.plots
+
+        # Resolve paths: if a path was not explicitly set, derive it from the current base_dir
+        self.checkpoints = self._explicit_checkpoints or os.environ.get("ORD_MED_SAVE_DIR", os.path.join(self.base_dir, "checkpoints"))
+        self.logs = self._explicit_logs or os.environ.get("ORD_MED_LOG_DIR", os.path.join(self.base_dir, "logs"))
+        self.tensorboard = self._explicit_tensorboard or os.path.join(self.base_dir, "tensorboard")
+        self.evaluation = self._explicit_evaluation or os.path.join(self.base_dir, "evaluation")
+        self.gradcam = self._explicit_gradcam or os.path.join(self.base_dir, "gradcam")
+        self.predictions = self._explicit_predictions or os.path.join(self.base_dir, "predictions")
+        self.metrics = self._explicit_metrics or os.path.join(self.base_dir, "metrics")
+        self.plots = self._explicit_plots or os.path.join(self.base_dir, "plots")
 
 
 @dataclass
@@ -93,7 +128,15 @@ class Config:
     loss: LossConfig = field(default_factory=LossConfig)
     referral: ReferralConfig = field(default_factory=ReferralConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
+    outputs: OutputsConfig = field(default_factory=OutputsConfig)
     visualization: VisualizationConfig = field(default_factory=VisualizationConfig)
+
+    def __post_init__(self):
+        # Propagate resolved centralized outputs paths to trainer settings if defaults are used
+        if self.trainer.save_dir in ("outputs/checkpoints/", "outputs/checkpoints"):
+            self.trainer.save_dir = self.outputs.checkpoints
+        if self.trainer.log_dir in ("outputs/logs/", "outputs/logs"):
+            self.trainer.log_dir = self.outputs.logs
 
     @classmethod
     def load_from_yaml(cls, yaml_path: str) -> "Config":
@@ -111,6 +154,7 @@ class Config:
         loss_cfg = LossConfig(**yaml_dict.get("loss", {}))
         referral_cfg = ReferralConfig(**yaml_dict.get("referral", {}))
         trainer_cfg = TrainerConfig(**yaml_dict.get("trainer", {}))
+        outputs_cfg = OutputsConfig(**yaml_dict.get("outputs", {}))
         vis_cfg = VisualizationConfig(**yaml_dict.get("visualization", {}))
 
         return cls(
@@ -120,6 +164,7 @@ class Config:
             loss=loss_cfg,
             referral=referral_cfg,
             trainer=trainer_cfg,
+            outputs=outputs_cfg,
             visualization=vis_cfg
         )
 

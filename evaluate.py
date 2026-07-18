@@ -31,14 +31,21 @@ def main():
 
     # 1. Load config and setup loggers
     config = Config.load_from_yaml(args.config)
-    os.makedirs(config.trainer.log_dir, exist_ok=True)
-    logger = setup_logger(config.trainer.log_dir, f"eval_{config.trainer.experiment_name}")
+    
+    # If the user passed output_dir, override the base_dir of config.outputs
+    if args.output_dir != "outputs/":
+        config.outputs.base_dir = args.output_dir
+        config.outputs.__post_init__()
+        config.__post_init__()
+        
+    os.makedirs(config.outputs.logs, exist_ok=True)
+    logger = setup_logger(config.outputs.logs, f"eval_{config.trainer.experiment_name}")
     logger.info(f"Starting evaluation of checkpoint: {args.checkpoint} on split: {args.split}")
 
     # Set up outputs directories
-    predictions_dir = os.path.join(args.output_dir, "predictions")
-    figures_dir = os.path.join(args.output_dir, "figures")
-    reports_dir = os.path.join(args.output_dir, "reports")
+    predictions_dir = config.outputs.predictions
+    figures_dir = config.outputs.plots
+    reports_dir = config.outputs.metrics
     
     os.makedirs(predictions_dir, exist_ok=True)
     os.makedirs(figures_dir, exist_ok=True)

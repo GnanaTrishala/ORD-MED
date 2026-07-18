@@ -166,8 +166,8 @@ def verify_all():
 
         # Confirm evaluation outputs are saved
         assert os.path.exists("temp_outputs/predictions/predictions_val.csv"), "Missing evaluation predictions CSV"
-        assert os.path.exists("temp_outputs/reports/metrics_val.json"), "Missing evaluation metrics JSON"
-        assert os.path.exists("temp_outputs/figures/dr_confusion_matrix.png"), "Missing evaluation figures"
+        assert os.path.exists("temp_outputs/metrics/metrics_val.json"), "Missing evaluation metrics JSON"
+        assert os.path.exists("temp_outputs/plots/dr_confusion_matrix.png"), "Missing evaluation figures"
         print("Verified evaluation prediction spreadsheets, JSON summaries, and visual figures exist.")
 
         # Step 5: Run Inference Script

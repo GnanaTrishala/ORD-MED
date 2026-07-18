@@ -125,6 +125,7 @@ def run_gradcam(
         # Save resulting file
         img_name = os.path.basename(image_path).rsplit(".", 1)[0]
         output_file = os.path.join(save_dir, f"{img_name}_gradcam_{task_name}_class_{target_class}.png")
+        os.makedirs(save_dir, exist_ok=True)
         cv2.imwrite(output_file, cam_image)
         
         print(f"Saved {task_name.upper()} Grad-CAM to: {output_file}")

@@ -22,10 +22,31 @@ def main():
     config = parse_args()
 
     # Auto-resume check: automatically detect and load latest interrupted checkpoint if available
+    last_pt_path = os.path.join(config.trainer.save_dir, "last.pt")
     interrupted_path = os.path.join(config.trainer.save_dir, "interrupted.pth")
-    if os.path.exists(interrupted_path):
+    if os.path.exists(last_pt_path):
         try:
-            checkpoint = torch.load(interrupted_path, map_location="cpu")
+            checkpoint = torch.load(last_pt_path, map_location="cpu", weights_only=False)
+            checkpoint_config = checkpoint.get("config", None)
+            should_resume = True
+            if checkpoint_config is not None:
+                curr_csv = getattr(config.dataset, "train_csv", "")
+                ckpt_csv = getattr(checkpoint_config.dataset, "train_csv", "")
+                if curr_csv != ckpt_csv:
+                    should_resume = False
+            
+            if should_resume:
+                loaded_epoch = checkpoint.get("epoch", 0)
+                print(f"Auto-resume checkpoint last.pt found. Resuming from Epoch {loaded_epoch}.")
+                config.trainer.checkpoint_path = last_pt_path
+            else:
+                print("Found last.pt but dataset config (train_csv) differs. Starting fresh.")
+        except Exception:
+            print("Auto-resume checkpoint last.pt found. Resuming training.")
+            config.trainer.checkpoint_path = last_pt_path
+    elif os.path.exists(interrupted_path):
+        try:
+            checkpoint = torch.load(interrupted_path, map_location="cpu", weights_only=False)
             loaded_epoch = checkpoint.get("epoch", 0)
             print(f"Checkpoint found. Resuming from Epoch {loaded_epoch}.")
         except Exception:
