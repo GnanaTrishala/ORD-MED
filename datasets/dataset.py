@@ -71,81 +71,14 @@ def ensure_dataset_files(config: Config) -> None:
 
 def resolve_csv_path(path: str) -> str:
     """Resolves local CSV paths to Kaggle dataset equivalents if running on Kaggle."""
-    if not path:
-        return path
-        
-    abs_path = resolve_project_path(path)
-    if os.path.exists(abs_path):
-        return abs_path
-        
-    norm_path = path.replace("\\", "/")
-    filename = os.path.basename(norm_path)
-    
-    # Kaggle input paths
-    kaggle_aptos = "/kaggle/input/aptos-blindness-detection"
-    kaggle_idrid = "/kaggle/input/idrid"
-    
-    candidates = [
-        abs_path,
-        os.path.join(resolve_project_path("dataset"), filename),
-    ]
-    
-    if "aptos" in norm_path.lower():
-        candidates.append(os.path.join(kaggle_aptos, filename))
-    elif "idrid" in norm_path.lower():
-        candidates.append(os.path.join(kaggle_idrid, filename))
-        
-    for c in candidates:
-        if os.path.exists(c):
-            return c
-            
-    return abs_path
+    from config import resolve_kaggle_path
+    return resolve_kaggle_path(path)
 
 
 def resolve_dir_path(path: str) -> str:
     """Resolves local dataset directory paths to Kaggle dataset input locations."""
-    if not path:
-        return path
-        
-    abs_path = resolve_project_path(path)
-    if os.path.exists(abs_path):
-        return abs_path
-        
-    norm_path = path.replace("\\", "/")
-    
-    # Kaggle input paths
-    kaggle_aptos = "/kaggle/input/aptos-blindness-detection"
-    kaggle_idrid = "/kaggle/input/idrid"
-    
-    if "aptos" in norm_path.lower():
-        if "train_images" in norm_path:
-            candidate = os.path.join(kaggle_aptos, "train_images")
-        elif "test_images" in norm_path:
-            candidate = os.path.join(kaggle_aptos, "test_images")
-        elif "val_images" in norm_path:
-            candidate = os.path.join(kaggle_aptos, "train_images")  # Map val to train on Kaggle
-        else:
-            candidate = kaggle_aptos
-        if os.path.exists(candidate):
-            return candidate
-            
-    elif "idrid" in norm_path.lower():
-        if "imagenes" in norm_path.lower():
-            candidates = [
-                os.path.join(kaggle_idrid, "Imagenes"),
-                os.path.join(kaggle_idrid, "Imagenes/Imagenes"),
-                os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Training Set"),
-            ]
-            for c in candidates:
-                if os.path.exists(c):
-                    return c
-        candidate = os.path.join(kaggle_idrid, os.path.basename(norm_path))
-        if os.path.exists(candidate):
-            return candidate
-        if os.path.exists(kaggle_idrid):
-            return kaggle_idrid
-            
-    return abs_path
+    from config import resolve_kaggle_path
+    return resolve_kaggle_path(path)
 
 
 def resolve_image_path(path: str, data_dir: str = "dataset/") -> str:
@@ -153,54 +86,8 @@ def resolve_image_path(path: str, data_dir: str = "dataset/") -> str:
     Dynamically resolves image paths to handle both local development
     and Kaggle environment dataset paths (single/double nested).
     """
-    if not path:
-        return path
-        
-    abs_path = resolve_project_path(path)
-    if os.path.exists(abs_path):
-        return abs_path
-        
-    abs_data_dir = resolve_project_path(data_dir)
-    norm_path = path.replace("\\", "/")
-    filename = os.path.basename(norm_path)
-    
-    # Kaggle dataset base paths
-    kaggle_aptos = "/kaggle/input/aptos-blindness-detection"
-    kaggle_idrid = "/kaggle/input/idrid"
-    
-    # Handle APTOS
-    if "aptos" in norm_path.lower():
-        subfolder = "train_images"
-        if "test" in norm_path.lower():
-            subfolder = "test_images"
-        elif "val" in norm_path.lower():
-            subfolder = "train_images"
-            
-        candidates = [
-            os.path.join(kaggle_aptos, subfolder, filename),
-            os.path.join(kaggle_aptos, subfolder, subfolder, filename),
-            os.path.join(abs_data_dir, "aptos", subfolder, filename),
-            os.path.join(abs_data_dir, "aptos", subfolder, subfolder, filename),
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                return c
-
-    # Handle IDRiD
-    elif "idrid" in norm_path.lower():
-        candidates = [
-            os.path.join(kaggle_idrid, "Imagenes", filename),
-            os.path.join(kaggle_idrid, "Imagenes/Imagenes", filename),
-            os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Training Set", filename),
-            os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Testing Set", filename),
-            os.path.join(abs_data_dir, "idrid/Imagenes", filename),
-            os.path.join(abs_data_dir, "idrid/Imagenes/Imagenes", filename),
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                return c
-                
-    return abs_path
+    from config import resolve_kaggle_path
+    return resolve_kaggle_path(path)
 
 
 class DiabeticEyeDataset(Dataset):
