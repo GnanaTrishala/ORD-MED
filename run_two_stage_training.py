@@ -38,11 +38,25 @@ def create_stage_datasets():
     os.makedirs(dataset_dir, exist_ok=True)
     
     splits = ["train", "val", "test"]
+    need_integrated = False
     for split in splits:
         integrated_path = os.path.join(dataset_dir, f"integrated_{split}.csv")
         if not os.path.exists(integrated_path):
-            raise FileNotFoundError(f"Missing integrated dataset mapping: {integrated_path}")
+            need_integrated = True
+            break
             
+    if need_integrated:
+        print("Required integrated CSVs not found. Automatically triggering dataset integration...")
+        try:
+            import integrate_datasets
+            integrate_datasets.main()
+            print("Dataset integration completed successfully.")
+        except Exception as e:
+            print(f"Failed to automatically integrate datasets: {e}")
+            raise e
+            
+    for split in splits:
+        integrated_path = os.path.join(dataset_dir, f"integrated_{split}.csv")
         df = pd.read_csv(integrated_path)
         
         # Filter for Stage 1 (APTOS only)

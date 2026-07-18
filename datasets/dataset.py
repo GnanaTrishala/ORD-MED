@@ -10,12 +10,73 @@ from config import Config
 from datasets.transforms import get_train_transforms, get_val_transforms
 
 
+def resolve_project_path(path: str) -> str:
+    """Resolves a relative path to be absolute relative to the project root directory."""
+    if not path:
+        return path
+    if os.path.isabs(path):
+        return path
+    # Get project root (where config.py / datasets/ is located)
+    # Since dataset.py is in datasets/ subfolder, the project root is one level up
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.abspath(os.path.join(project_root, path))
+
+
+def ensure_dataset_files(config: Config) -> None:
+    """Checks for required dataset CSVs and automatically generates them if missing."""
+    train_path = resolve_csv_path(config.dataset.train_csv)
+    val_path = resolve_csv_path(config.dataset.val_csv)
+    test_path = resolve_csv_path(config.dataset.test_csv)
+    
+    # Check if we need to generate integrated datasets
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    int_train = os.path.abspath(os.path.join(project_root, "dataset/integrated_train.csv"))
+    int_val = os.path.abspath(os.path.join(project_root, "dataset/integrated_val.csv"))
+    int_test = os.path.abspath(os.path.join(project_root, "dataset/integrated_test.csv"))
+    
+    need_integrated = False
+    if not (os.path.exists(resolve_csv_path(config.dataset.train_csv)) and 
+            os.path.exists(resolve_csv_path(config.dataset.val_csv)) and 
+            os.path.exists(resolve_csv_path(config.dataset.test_csv))):
+        need_integrated = True
+        
+    if not (os.path.exists(int_train) and os.path.exists(int_val) and os.path.exists(int_test)):
+        if not (os.path.exists(train_path) and os.path.exists(val_path) and os.path.exists(test_path)):
+            need_integrated = True
+            
+    if need_integrated:
+        print("Required integrated CSVs not found. Automatically triggering dataset integration...")
+        try:
+            import integrate_datasets
+            integrate_datasets.main()
+            print("Dataset integration completed successfully.")
+        except Exception as e:
+            print(f"Failed to automatically integrate datasets: {e}")
+            raise e
+            
+    # Check if target paths are stage-specific and still missing
+    train_path = resolve_csv_path(config.dataset.train_csv)
+    val_path = resolve_csv_path(config.dataset.val_csv)
+    if not (os.path.exists(train_path) and os.path.exists(val_path)):
+        if any(x in train_path for x in ["stage1", "stage2", "aptos", "idrid"]):
+            print("Stage-specific CSVs not found. Automatically triggering partition splitting...")
+            try:
+                from run_two_stage_training import create_stage_datasets
+                create_stage_datasets()
+                print("Stage partitioning completed successfully.")
+            except Exception as e:
+                print(f"Failed to automatically split stage datasets: {e}")
+                raise e
+
+
 def resolve_csv_path(path: str) -> str:
     """Resolves local CSV paths to Kaggle dataset equivalents if running on Kaggle."""
     if not path:
         return path
-    if os.path.exists(path):
-        return path
+        
+    abs_path = resolve_project_path(path)
+    if os.path.exists(abs_path):
+        return abs_path
         
     norm_path = path.replace("\\", "/")
     filename = os.path.basename(norm_path)
@@ -25,8 +86,8 @@ def resolve_csv_path(path: str) -> str:
     kaggle_idrid = "/kaggle/input/idrid"
     
     candidates = [
-        path,
-        os.path.join("dataset", filename),
+        abs_path,
+        os.path.join(resolve_project_path("dataset"), filename),
     ]
     
     if "aptos" in norm_path.lower():
@@ -38,15 +99,17 @@ def resolve_csv_path(path: str) -> str:
         if os.path.exists(c):
             return c
             
-    return path
+    return abs_path
 
 
 def resolve_dir_path(path: str) -> str:
     """Resolves local dataset directory paths to Kaggle dataset input locations."""
     if not path:
         return path
-    if os.path.exists(path):
-        return path
+        
+    abs_path = resolve_project_path(path)
+    if os.path.exists(abs_path):
+        return abs_path
         
     norm_path = path.replace("\\", "/")
     
@@ -82,7 +145,7 @@ def resolve_dir_path(path: str) -> str:
         if os.path.exists(kaggle_idrid):
             return kaggle_idrid
             
-    return path
+    return abs_path
 
 
 def resolve_image_path(path: str, data_dir: str = "dataset/") -> str:
@@ -92,9 +155,12 @@ def resolve_image_path(path: str, data_dir: str = "dataset/") -> str:
     """
     if not path:
         return path
-    if os.path.exists(path):
-        return path
-
+        
+    abs_path = resolve_project_path(path)
+    if os.path.exists(abs_path):
+        return abs_path
+        
+    abs_data_dir = resolve_project_path(data_dir)
     norm_path = path.replace("\\", "/")
     filename = os.path.basename(norm_path)
     
@@ -113,8 +179,8 @@ def resolve_image_path(path: str, data_dir: str = "dataset/") -> str:
         candidates = [
             os.path.join(kaggle_aptos, subfolder, filename),
             os.path.join(kaggle_aptos, subfolder, subfolder, filename),
-            os.path.join(data_dir, "aptos", subfolder, filename),
-            os.path.join(data_dir, "aptos", subfolder, subfolder, filename),
+            os.path.join(abs_data_dir, "aptos", subfolder, filename),
+            os.path.join(abs_data_dir, "aptos", subfolder, subfolder, filename),
         ]
         for c in candidates:
             if os.path.exists(c):
@@ -127,14 +193,14 @@ def resolve_image_path(path: str, data_dir: str = "dataset/") -> str:
             os.path.join(kaggle_idrid, "Imagenes/Imagenes", filename),
             os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Training Set", filename),
             os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Testing Set", filename),
-            os.path.join(data_dir, "idrid/Imagenes", filename),
-            os.path.join(data_dir, "idrid/Imagenes/Imagenes", filename),
+            os.path.join(abs_data_dir, "idrid/Imagenes", filename),
+            os.path.join(abs_data_dir, "idrid/Imagenes/Imagenes", filename),
         ]
         for c in candidates:
             if os.path.exists(c):
                 return c
                 
-    return path
+    return abs_path
 
 
 class DiabeticEyeDataset(Dataset):
@@ -240,6 +306,7 @@ def get_dataloaders(
     Returns:
         DataLoader or Tuple[DataLoader, DataLoader]: Returns dataloaders for the specified splits.
     """
+    ensure_dataset_files(config)
     loaders = []
 
     for split in splits:
@@ -309,6 +376,7 @@ def verify_and_report_dataset(config: Config, logger: Any) -> None:
     label counts, missing files, and class distributions, printing
     a detailed clinical database report.
     """
+    ensure_dataset_files(config)
     logger.info("=======================================================")
     logger.info("ORD-MED DATASET VERIFICATION REPORT")
     logger.info("=======================================================")
