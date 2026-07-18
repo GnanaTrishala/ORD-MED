@@ -5,12 +5,89 @@ from typing import List, Dict, Any, Optional
 import yaml
 
 
+def resolve_kaggle_path(path: str) -> str:
+    """Resolves local dataset paths to Kaggle dataset equivalents if running on Kaggle."""
+    if not path:
+        return path
+        
+    # Get project root (where config.py is located)
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    abs_path = os.path.abspath(os.path.join(project_root, path))
+    if os.path.exists(abs_path):
+        return abs_path
+        
+    norm_path = path.replace("\\", "/")
+    
+    # Kaggle input paths
+    kaggle_aptos = "/kaggle/input/aptos-blindness-detection"
+    kaggle_idrid = "/kaggle/input/idrid"
+    
+    # Check if running on Kaggle
+    if os.path.exists("/kaggle/input") or os.path.exists("/kaggle/working"):
+        # Map APTOS paths
+        if "aptos" in norm_path.lower():
+            if norm_path.endswith(".csv"):
+                filename = os.path.basename(norm_path)
+                candidate = os.path.join(kaggle_aptos, filename)
+                if os.path.exists(candidate):
+                    return candidate
+            else:
+                # Images folders
+                if "val_images" in norm_path.lower():
+                    candidate = os.path.join(kaggle_aptos, "train_images")
+                elif "test_images" in norm_path.lower():
+                    candidate = os.path.join(kaggle_aptos, "test_images")
+                elif "train_images" in norm_path.lower():
+                    candidate = os.path.join(kaggle_aptos, "train_images")
+                else:
+                    candidate = os.path.join(kaggle_aptos, os.path.basename(norm_path))
+                if os.path.exists(candidate):
+                    return candidate
+                    
+        # Map IDRiD paths
+        elif "idrid" in norm_path.lower():
+            if norm_path.endswith(".csv"):
+                filename = os.path.basename(norm_path)
+                candidate = os.path.join(kaggle_idrid, filename)
+                if os.path.exists(candidate):
+                    return candidate
+            else:
+                if "imagenes" in norm_path.lower():
+                    candidates = [
+                        os.path.join(kaggle_idrid, "Imagenes"),
+                        os.path.join(kaggle_idrid, "Imagenes/Imagenes"),
+                        os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Training Set"),
+                    ]
+                    for c in candidates:
+                        if os.path.exists(c):
+                            return c
+                candidate = os.path.join(kaggle_idrid, os.path.basename(norm_path))
+                if os.path.exists(candidate):
+                    return candidate
+                    
+    return abs_path
+
+
 @dataclass
 class DatasetConfig:
     data_dir: str = "dataset/"
     train_csv: str = "dataset/integrated_train.csv"
     val_csv: str = "dataset/integrated_val.csv"
     test_csv: str = "dataset/integrated_test.csv"
+    
+    # Raw APTOS dataset paths
+    aptos_train_csv: str = "dataset/aptos/train_1.csv"
+    aptos_train_images: str = "dataset/aptos/train_images"
+    aptos_val_csv: str = "dataset/aptos/valid.csv"
+    aptos_val_images: str = "dataset/aptos/val_images"
+    aptos_test_csv: str = "dataset/aptos/test.csv"
+    aptos_test_images: str = "dataset/aptos/test_images"
+    
+    # Raw IDRiD dataset paths
+    idrid_csv: str = "dataset/idrid/idrid_labels.csv"
+    idrid_images: str = "dataset/idrid/Imagenes"
+    
+    # Dataloader configurations
     image_size: int = 512
     batch_size: int = 16
     num_workers: int = 4
@@ -18,6 +95,23 @@ class DatasetConfig:
     augmentations: List[str] = field(
         default_factory=lambda: ["random_crop", "horizontal_flip", "vertical_flip", "color_jitter"]
     )
+
+    def __post_init__(self):
+        # Resolve all dataset paths
+        self.data_dir = resolve_kaggle_path(self.data_dir)
+        self.train_csv = resolve_kaggle_path(self.train_csv)
+        self.val_csv = resolve_kaggle_path(self.val_csv)
+        self.test_csv = resolve_kaggle_path(self.test_csv)
+        
+        self.aptos_train_csv = resolve_kaggle_path(self.aptos_train_csv)
+        self.aptos_train_images = resolve_kaggle_path(self.aptos_train_images)
+        self.aptos_val_csv = resolve_kaggle_path(self.aptos_val_csv)
+        self.aptos_val_images = resolve_kaggle_path(self.aptos_val_images)
+        self.aptos_test_csv = resolve_kaggle_path(self.aptos_test_csv)
+        self.aptos_test_images = resolve_kaggle_path(self.aptos_test_images)
+        
+        self.idrid_csv = resolve_kaggle_path(self.idrid_csv)
+        self.idrid_images = resolve_kaggle_path(self.idrid_images)
 
 
 @dataclass

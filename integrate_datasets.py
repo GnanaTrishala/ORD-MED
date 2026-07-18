@@ -120,8 +120,15 @@ def process_dataset(
         except Exception:
             pass
 
+        proj_root = os.path.dirname(os.path.abspath(__file__))
+        abs_img_path = os.path.abspath(img_path)
+        if abs_img_path.startswith(proj_root):
+            rel_img_path = os.path.relpath(abs_img_path, proj_root).replace("\\", "/")
+        else:
+            rel_img_path = abs_img_path.replace("\\", "/")
+
         valid_records.append({
-            "image_path": os.path.relpath(img_path, os.getcwd()).replace("\\", "/"),
+            "image_path": rel_img_path,
             "dr_label": dr_val,
             "dme_label": dme_val,
             "dataset_source": dataset_name.lower()
@@ -249,78 +256,54 @@ def save_sample_grid(df: pd.DataFrame, save_path: str):
     print(f"Saved sample image grid to: {save_path}")
 
 
-def resolve_source_path(path: str) -> str:
-    """Resolves a local dataset path to its Kaggle counterpart if on Kaggle/local missing."""
-    if os.path.exists(path):
-        return path
-        
-    norm_path = path.replace("\\", "/")
-    
-    # Kaggle input paths
-    kaggle_aptos = "/kaggle/input/aptos-blindness-detection"
-    kaggle_idrid = "/kaggle/input/idrid"
-    
-    if "dataset/aptos" in norm_path:
-        if norm_path.endswith(".csv"):
-            candidate = norm_path.replace("dataset/aptos", kaggle_aptos)
-            if os.path.exists(candidate):
-                return candidate
-        else:
-            if "val_images" in norm_path:
-                candidate = os.path.join(kaggle_aptos, "train_images")
-            elif "test_images" in norm_path:
-                candidate = os.path.join(kaggle_aptos, "test_images")
-            elif "train_images" in norm_path:
-                candidate = os.path.join(kaggle_aptos, "train_images")
-            else:
-                candidate = norm_path.replace("dataset/aptos", kaggle_aptos)
-            if os.path.exists(candidate):
-                return candidate
-                
-    elif "dataset/idrid" in norm_path:
-        if norm_path.endswith(".csv"):
-            candidate = norm_path.replace("dataset/idrid", kaggle_idrid)
-            if os.path.exists(candidate):
-                return candidate
-        else:
-            if "Imagenes" in norm_path:
-                candidates = [
-                    os.path.join(kaggle_idrid, "Imagenes"),
-                    os.path.join(kaggle_idrid, "Imagenes/Imagenes"),
-                    os.path.join(kaggle_idrid, "disease-grading/disease-grading/Original Images/Training Set"),
-                ]
-                for c in candidates:
-                    if os.path.exists(c):
-                        return c
-            candidate = norm_path.replace("dataset/idrid", kaggle_idrid)
-            if os.path.exists(candidate):
-                return candidate
-                
-    return path
+def main(config=None):
+    if config is None:
+        from config import Config
+        config = Config()
 
+    # Validate all raw inputs
+    inputs_to_validate = {
+        "APTOS Train CSV": config.dataset.aptos_train_csv,
+        "APTOS Train Images": config.dataset.aptos_train_images,
+        "APTOS Val CSV": config.dataset.aptos_val_csv,
+        "APTOS Val Images": config.dataset.aptos_val_images,
+        "APTOS Test CSV": config.dataset.aptos_test_csv,
+        "APTOS Test Images": config.dataset.aptos_test_images,
+        "IDRiD CSV": config.dataset.idrid_csv,
+        "IDRiD Images": config.dataset.idrid_images,
+    }
+    
+    missing_files = []
+    for name, path in inputs_to_validate.items():
+        if not path or not os.path.exists(path):
+            missing_files.append(f"{name}: {path}")
+            
+    if missing_files:
+        error_msg = "Dataset integration failed! The following required input paths are missing:\n" + "\n".join(missing_files)
+        print(error_msg)
+        raise FileNotFoundError(error_msg)
 
-def main():
     # 1. Process APTOS splits
     aptos_train = process_dataset(
-        resolve_source_path("dataset/aptos/train_1.csv"),
-        resolve_source_path("dataset/aptos/train_images"),
+        config.dataset.aptos_train_csv,
+        config.dataset.aptos_train_images,
         "aptos", is_idrid=False
     )
     aptos_val = process_dataset(
-        resolve_source_path("dataset/aptos/valid.csv"),
-        resolve_source_path("dataset/aptos/val_images"),
+        config.dataset.aptos_val_csv,
+        config.dataset.aptos_val_images,
         "aptos", is_idrid=False
     )
     aptos_test = process_dataset(
-        resolve_source_path("dataset/aptos/test.csv"),
-        resolve_source_path("dataset/aptos/test_images"),
+        config.dataset.aptos_test_csv,
+        config.dataset.aptos_test_images,
         "aptos", is_idrid=False
     )
 
     # 2. Process IDRiD complete dataset
     idrid_all = process_dataset(
-        resolve_source_path("dataset/idrid/idrid_labels.csv"),
-        resolve_source_path("dataset/idrid/Imagenes"),
+        config.dataset.idrid_csv,
+        config.dataset.idrid_images,
         "idrid", is_idrid=True
     )
 
@@ -349,18 +332,16 @@ def main():
     train_integrated = train_integrated.sample(frac=1.0, random_state=42).reset_index(drop=True)
 
     # 5. Export integrated metadata CSV files
-    base_proj_dir = "/kaggle/working/ORD-MED" if os.path.exists("/kaggle/working") else "."
-    dataset_dir = os.path.join(base_proj_dir, "dataset")
-    os.makedirs(dataset_dir, exist_ok=True)
-    train_integrated.to_csv(os.path.join(dataset_dir, "integrated_train.csv"), index=False)
-    val_integrated.to_csv(os.path.join(dataset_dir, "integrated_val.csv"), index=False)
-    test_integrated.to_csv(os.path.join(dataset_dir, "integrated_test.csv"), index=False)
-    print(f"\nExported integrated metadata CSV files to {dataset_dir}/integrated_*.csv")
+    os.makedirs(os.path.dirname(config.dataset.train_csv), exist_ok=True)
+    train_integrated.to_csv(config.dataset.train_csv, index=False)
+    val_integrated.to_csv(config.dataset.val_csv, index=False)
+    test_integrated.to_csv(config.dataset.test_csv, index=False)
+    print(f"\nExported integrated metadata CSV files to {os.path.dirname(config.dataset.train_csv)}/integrated_*.csv")
 
     # 6. Generate statistics and figures
     generate_statistics(train_integrated, val_integrated, test_integrated)
     
-    figures_dir = os.path.join(base_proj_dir, "outputs/plots")
+    figures_dir = config.outputs.plots
     os.makedirs(figures_dir, exist_ok=True)
     plot_distributions(train_integrated, val_integrated, test_integrated, os.path.join(figures_dir, "integrated_dataset_distribution.png"))
     save_sample_grid(train_integrated, os.path.join(figures_dir, "integrated_sample_images.png"))
