@@ -1,0 +1,3 @@
+image_path,dr_label,dme_label,dataset_source
+temp_data_two_stage/images/eye_4.png,3,2,idrid
+temp_data_two_stage/images/eye_5.png,0,0,idrid

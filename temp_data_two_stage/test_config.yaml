@@ -1,0 +1,58 @@
+
+encoder:
+  name: "efficientnet_b0"
+  pretrained: false
+  checkpoint_path: null
+  freeze_features: false
+  dropout: 0.1
+
+heads:
+  dr_num_classes: 5
+  dme_num_classes: 3
+  use_evidential: true
+  projection_dim: 512
+
+loss:
+  ordinal_method: "corn"
+  dme_loss_type: "bce"
+  dme_class_weights: [1.0, 1.0, 1.0]
+  focal_gamma: 2.0
+  evidential_loss_type: "mse"
+  lambda1: 1.0
+  lambda2: 1.0
+  lambda3: 0.5
+
+dataset:
+  data_dir: "temp_data_two_stage/images"
+  train_csv: "temp_data_two_stage/integrated_train.csv"
+  val_csv: "temp_data_two_stage/integrated_val.csv"
+  test_csv: "temp_data_two_stage/integrated_test.csv"
+  image_size: 512
+  batch_size: 2
+  num_workers: 0
+  pin_memory: false
+
+trainer:
+  epochs: 1
+  lr: 0.0001
+  weight_decay: 0.00001
+  optimizer: "AdamW"
+  lr_scheduler: "CosineAnnealingLR"
+  device: "cpu"
+  seed: 42
+  save_dir: "temp_outputs_two_stage/checkpoints"
+  checkpoint_path: null
+  log_dir: "temp_outputs_two_stage/logs"
+  project_name: "ORD-MED-STAGE-TEST"
+  experiment_name: "test_run"
+  use_amp: false
+  patience: 2
+
+referral:
+  dr_severity_threshold: 2
+  dme_severity_threshold: 1
+  uncertainty_threshold: 0.4
+
+visualization:
+  use_gradcam: false
+  cam_target_layers: ["shared_projection"]

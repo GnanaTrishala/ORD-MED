@@ -1,0 +1,68 @@
+# ORD-MED Baseline Configuration File
+
+dataset:
+  data_dir: "dataset/"
+  train_csv: "dataset/integrated_train.csv"
+  val_csv: "dataset/integrated_val.csv"
+  test_csv: "dataset/integrated_test.csv"
+  image_size: 512
+  batch_size: 8
+  num_workers: 4
+  pin_memory: true
+  augmentations:
+    - "random_crop"
+    - "horizontal_flip"
+    - "vertical_flip"
+    - "color_jitter"
+
+encoder:
+  name: "efficientnet_b4"
+  pretrained: true
+  checkpoint_path: null
+  freeze_features: false
+  dropout: 0.3
+
+heads:
+  dr_num_classes: 5
+  dme_num_classes: 3
+  use_evidential: true
+  projection_dim: 512
+
+loss:
+  ordinal_weight: 1.0
+  evidential_weight: 0.5
+  multitask_weights:
+    dr: 1.0
+    dme: 1.0
+  lambda1: 1.0
+  lambda2: 1.0
+  lambda3: 0.5
+  dme_loss_type: "bce"
+  dme_class_weights: null
+  focal_gamma: 2.0
+
+referral:
+  dr_severity_threshold: 2
+  dme_severity_threshold: 1
+  uncertainty_threshold: 0.4
+
+trainer:
+  epochs: 30
+  lr: 0.0001
+  weight_decay: 0.00001
+  optimizer: "AdamW"
+  lr_scheduler: "CosineAnnealingLR"
+  device: "cuda"
+  seed: 42
+  save_dir: "outputs/checkpoints/"
+  checkpoint_path: null
+  log_dir: "outputs/logs/"
+  project_name: "ORD-MED"
+  experiment_name: "base_efficientnet_b4"
+  use_amp: true
+  patience: 10
+
+visualization:
+  use_gradcam: true
+  cam_target_layers:
+    - "backbone.conv_head"
