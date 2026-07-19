@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from PIL import Image
 from sklearn.model_selection import train_test_split
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 
 def calculate_md5(filepath: str) -> str:
@@ -34,7 +34,8 @@ def process_dataset(
     csv_path: str,
     img_dir_base: str,
     dataset_name: str,
-    is_idrid: bool = False
+    is_idrid: bool = False,
+    seen_hashes: Optional[set] = None
 ) -> pd.DataFrame:
     """
     Verifies images, verifies labels, detects corrupted files, 
@@ -56,7 +57,8 @@ def process_dataset(
     corrupted_count = 0
     invalid_label_count = 0
     duplicate_count = 0
-    seen_hashes = set()
+    if seen_hashes is None:
+        seen_hashes = set()
 
     for idx, row in df.iterrows():
         id_code = str(row[id_col]).strip()
@@ -283,28 +285,35 @@ def main(config=None):
         print(error_msg)
         raise FileNotFoundError(error_msg)
 
+    # Initialize global seen_hashes set to prevent data leakage across splits
+    global_seen_hashes = set()
+
     # 1. Process APTOS splits
     aptos_train = process_dataset(
         config.dataset.aptos_train_csv,
         config.dataset.aptos_train_images,
-        "aptos", is_idrid=False
+        "aptos", is_idrid=False,
+        seen_hashes=global_seen_hashes
     )
     aptos_val = process_dataset(
         config.dataset.aptos_val_csv,
         config.dataset.aptos_val_images,
-        "aptos", is_idrid=False
+        "aptos", is_idrid=False,
+        seen_hashes=global_seen_hashes
     )
     aptos_test = process_dataset(
         config.dataset.aptos_test_csv,
         config.dataset.aptos_test_images,
-        "aptos", is_idrid=False
+        "aptos", is_idrid=False,
+        seen_hashes=global_seen_hashes
     )
 
     # 2. Process IDRiD complete dataset
     idrid_all = process_dataset(
         config.dataset.idrid_csv,
         config.dataset.idrid_images,
-        "idrid", is_idrid=True
+        "idrid", is_idrid=True,
+        seen_hashes=global_seen_hashes
     )
 
     # 3. Automatically split IDRiD into train, validation, and test splits

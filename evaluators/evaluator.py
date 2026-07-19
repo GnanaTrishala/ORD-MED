@@ -70,14 +70,34 @@ class MultiTaskEvaluator:
             dr_logits = outputs["dr_logits"]
             dme_logits = outputs["dme_logits"]
 
-            dr_probs = torch.softmax(dr_logits, dim=-1)
+            # DME uses standard softmax
             dme_probs = torch.softmax(dme_logits, dim=-1)
+            dme_preds = torch.argmax(dme_probs, dim=-1)
+
+            # DR uses CORN or EMD
+            ordinal_method = getattr(self.config.loss, "ordinal_method", "corn")
+            if ordinal_method == "corn":
+                num_classes_dr = self.config.heads.dr_num_classes
+                corn_logits = dr_logits[:, :num_classes_dr - 1]
+                
+                sigmoids = torch.sigmoid(corn_logits)
+                cum_probs = torch.ones(sigmoids.size(0), num_classes_dr, device=sigmoids.device)
+                cum_probs[:, 1:] = torch.cumprod(sigmoids, dim=-1)
+                
+                dr_probs = torch.zeros_like(cum_probs)
+                dr_probs[:, :-1] = cum_probs[:, :-1] - cum_probs[:, 1:]
+                dr_probs[:, -1] = cum_probs[:, -1]
+                
+                dr_preds = (corn_logits > 0).sum(dim=-1)
+            else:
+                dr_probs = torch.softmax(dr_logits, dim=-1)
+                dr_preds = torch.argmax(dr_probs, dim=-1)
 
             all_dr_probs.extend(dr_probs.cpu().numpy())
             all_dme_probs.extend(dme_probs.cpu().numpy())
 
-            all_dr_preds.extend(torch.argmax(dr_probs, dim=-1).cpu().numpy())
-            all_dme_preds.extend(torch.argmax(dme_probs, dim=-1).cpu().numpy())
+            all_dr_preds.extend(dr_preds.cpu().numpy())
+            all_dme_preds.extend(dme_preds.cpu().numpy())
 
             # Epistemic uncertainty u = K / S if evidential is active
             if self.use_evidential and "dr_evidence" in outputs:

@@ -83,11 +83,29 @@ class Predictor:
         dr_logits = outputs["dr_logits"]
         dme_logits = outputs["dme_logits"]
 
-        dr_probs = torch.softmax(dr_logits, dim=-1).squeeze(0)  # Shape: (K_dr,)
-        dme_probs = torch.softmax(dme_logits, dim=-1).squeeze(0)  # Shape: (K_dme,)
-
-        dr_class = torch.argmax(dr_probs).item()
+        # DME uses standard softmax
+        dme_probs = torch.softmax(dme_logits, dim=-1).squeeze(0)
         dme_class = torch.argmax(dme_probs).item()
+
+        # DR uses CORN or EMD
+        ordinal_method = getattr(self.config.loss, "ordinal_method", "corn")
+        if ordinal_method == "corn":
+            num_classes_dr = self.config.heads.dr_num_classes
+            corn_logits = dr_logits[:, :num_classes_dr - 1]
+            
+            sigmoids = torch.sigmoid(corn_logits)
+            cum_probs = torch.ones(sigmoids.size(0), num_classes_dr, device=sigmoids.device)
+            cum_probs[:, 1:] = torch.cumprod(sigmoids, dim=-1)
+            
+            dr_probs = torch.zeros_like(cum_probs)
+            dr_probs[:, :-1] = cum_probs[:, :-1] - cum_probs[:, 1:]
+            dr_probs[:, -1] = cum_probs[:, -1]
+            dr_probs = dr_probs.squeeze(0)
+            
+            dr_class = int((corn_logits > 0).sum(dim=-1).item())
+        else:
+            dr_probs = torch.softmax(dr_logits, dim=-1).squeeze(0)
+            dr_class = torch.argmax(dr_probs).item()
 
         dr_confidence = float(dr_probs[dr_class].item())
         dme_confidence = float(dme_probs[dme_class].item())

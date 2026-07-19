@@ -246,12 +246,13 @@ class MultiTaskLoss(nn.Module):
             dme_alpha = outputs["dme_evidence"]
             
             # Compute evidential losses and get uncertainties per sample
+            max_epochs = getattr(self.config.trainer, "epochs", 10)
             if dr_mask.any():
-                loss_dr_ev, dr_u = self.dr_evidential(dr_alpha[dr_mask], dr_targets[dr_mask], epoch=epoch)
+                loss_dr_ev, dr_u = self.dr_evidential(dr_alpha[dr_mask], dr_targets[dr_mask], epoch=epoch, max_epochs=max_epochs)
                 dr_u_mean = torch.mean(dr_u)
                 
             if dme_mask.any():
-                loss_dme_ev, dme_u = self.dme_evidential(dme_alpha[dme_mask], dme_targets[dme_mask], epoch=epoch)
+                loss_dme_ev, dme_u = self.dme_evidential(dme_alpha[dme_mask], dme_targets[dme_mask], epoch=epoch, max_epochs=max_epochs)
                 dme_u_mean = torch.mean(dme_u)
 
         # --- 4. Final Aggregated Multi-Task Loss ---

@@ -110,8 +110,18 @@ def run_gradcam(
         # Retrieve prediction category to align visualization target
         with torch.no_grad():
             outputs = model(input_tensor)
-            logits = outputs["dr_logits"] if task_name == "dr" else outputs["dme_logits"]
-            target_class = torch.argmax(logits, dim=-1).item()
+            if task_name == "dr":
+                logits = outputs["dr_logits"]
+                config = getattr(model, "config", None)
+                ordinal_method = getattr(config.loss, "ordinal_method", "corn") if config is not None else "corn"
+                if ordinal_method == "corn":
+                    num_classes_dr = config.heads.dr_num_classes if config is not None else 5
+                    target_class = int((logits[:, :num_classes_dr - 1] > 0).sum(dim=-1).item())
+                else:
+                    target_class = torch.argmax(logits, dim=-1).item()
+            else:
+                logits = outputs["dme_logits"]
+                target_class = torch.argmax(logits, dim=-1).item()
 
         targets = [ClassifierOutputTarget(target_class)]
 

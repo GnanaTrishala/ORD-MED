@@ -67,8 +67,17 @@ def generate_cam_overlay(model, image_np, transforms, task_name, target_layers, 
     # Get target class for optimization
     with torch.no_grad():
         outputs = model(input_tensor)
-        logits = outputs["dr_logits"] if task_name == "dr" else outputs["dme_logits"]
-        target_class = torch.argmax(logits, dim=-1).item()
+        if task_name == "dr":
+            logits = outputs["dr_logits"]
+            ordinal_method = getattr(config.loss, "ordinal_method", "corn")
+            if ordinal_method == "corn":
+                num_classes_dr = config.heads.dr_num_classes
+                target_class = int((logits[:, :num_classes_dr - 1] > 0).sum(dim=-1).item())
+            else:
+                target_class = torch.argmax(logits, dim=-1).item()
+        else:
+            logits = outputs["dme_logits"]
+            target_class = torch.argmax(logits, dim=-1).item()
 
     # Instantiate Grad-CAM engine
     cam = GradCAMPlusPlus(model=wrapped_model, target_layers=resolved_layers)
