@@ -26,10 +26,9 @@ def resolve_kaggle_path(path: str) -> str:
         # Map APTOS paths
         if "aptos" in norm_path.lower():
             if norm_path.endswith(".csv"):
-                target_filename = "train.csv" if filename == "train_1.csv" else filename
-                candidate = os.path.join(kaggle_aptos, target_filename)
+                candidate = os.path.join(kaggle_aptos, filename)
                 if os.path.exists(candidate):
-                    return candidate
+                    return candidate.replace("\\", "/")
             elif any(x in norm_path.lower() for x in [".png", ".jpg", ".jpeg"]):
                 # Resolving an image path
                 subfolder = "train_images"
@@ -43,7 +42,7 @@ def resolve_kaggle_path(path: str) -> str:
                 ]
                 for c in candidates:
                     if os.path.exists(c):
-                        return c
+                        return c.replace("\\", "/")
             else:
                 # Images folders
                 if "val_images" in norm_path.lower():
@@ -55,14 +54,14 @@ def resolve_kaggle_path(path: str) -> str:
                 else:
                     candidate = os.path.join(kaggle_aptos, filename)
                 if os.path.exists(candidate):
-                    return candidate
+                    return candidate.replace("\\", "/")
                     
         # Map IDRiD paths
         elif "idrid" in norm_path.lower():
             if norm_path.endswith(".csv"):
                 candidate = os.path.join(kaggle_idrid, filename)
                 if os.path.exists(candidate):
-                    return candidate
+                    return candidate.replace("\\", "/")
             elif any(x in norm_path.lower() for x in [".png", ".jpg", ".jpeg"]):
                 # Resolving an image path
                 candidates = [
@@ -73,7 +72,7 @@ def resolve_kaggle_path(path: str) -> str:
                 ]
                 for c in candidates:
                     if os.path.exists(c):
-                        return c
+                        return c.replace("\\", "/")
             else:
                 if "imagenes" in norm_path.lower():
                     candidates = [
@@ -83,10 +82,10 @@ def resolve_kaggle_path(path: str) -> str:
                     ]
                     for c in candidates:
                         if os.path.exists(c):
-                            return c
+                            return c.replace("\\", "/")
                 candidate = os.path.join(kaggle_idrid, filename)
                 if os.path.exists(candidate):
-                    return candidate
+                    return candidate.replace("\\", "/")
                     
     return abs_path
 
