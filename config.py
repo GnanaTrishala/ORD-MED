@@ -26,7 +26,8 @@ def resolve_kaggle_path(path: str) -> str:
         # Map APTOS paths
         if "aptos" in norm_path.lower():
             if norm_path.endswith(".csv"):
-                candidate = os.path.join(kaggle_aptos, filename)
+                target_filename = "train.csv" if filename == "train_1.csv" else filename
+                candidate = os.path.join(kaggle_aptos, target_filename)
                 if os.path.exists(candidate):
                     return candidate
             elif any(x in norm_path.lower() for x in [".png", ".jpg", ".jpeg"]):
@@ -35,7 +36,7 @@ def resolve_kaggle_path(path: str) -> str:
                 if "test" in norm_path.lower():
                     subfolder = "test_images"
                 elif "val" in norm_path.lower():
-                    subfolder = "train_images"
+                    subfolder = "val_images"
                 candidates = [
                     os.path.join(kaggle_aptos, subfolder, filename),
                     os.path.join(kaggle_aptos, subfolder, subfolder, filename),
@@ -46,7 +47,7 @@ def resolve_kaggle_path(path: str) -> str:
             else:
                 # Images folders
                 if "val_images" in norm_path.lower():
-                    candidate = os.path.join(kaggle_aptos, "train_images")
+                    candidate = os.path.join(kaggle_aptos, "val_images")
                 elif "test_images" in norm_path.lower():
                     candidate = os.path.join(kaggle_aptos, "test_images")
                 elif "train_images" in norm_path.lower():
